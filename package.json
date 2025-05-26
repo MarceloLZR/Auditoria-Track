@@ -1,0 +1,57 @@
+{
+  "name": "auditores-progress-tracker",
+  "version": "1.0.0",
+  "description": "Sistema de seguimiento de tareas para auditores",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build-win": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.auditores.progresstracker",
+    "productName": "Auditores Progress Tracker",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!node_modules/*.d.ts",
+      "!node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/auditores.db",
+        "to": "assets/auditores.db"
+      }
+    ],
+    "asarUnpack": [
+      "**/*.node",
+      "assets/auditores.db"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "assets/app_icon.ico"
+    },
+    "portable": {
+      "artifactName": "AuditoresProgressTracker-Portable.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4"
+  },
+  "dependencies": {
+    "auditores-progress-tracker": "file:",
+    "better-sqlite3": "^9.2.2"
+  }
+}

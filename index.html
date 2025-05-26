@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Seguimiento - Auditores</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Sistema de Seguimiento de Tareas - Auditores Caja</h1>
+            <div class="header-controls">
+                <button id="refreshBtn" class="btn btn-secondary">🔄 Actualizar</button>
+                <button id="addTaskBtn" class="btn btn-primary">➕ Nueva Tarea</button>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="dashboard">📈 Dashboard</button>
+            <button class="tab-btn" data-tab="tasks">📋 Tareas</button>
+            <button class="tab-btn" data-tab="add-task">➕ Registrar</button>
+        </nav>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>📊 Progreso por Auditor</h3>
+                    <canvas id="auditorChart"></canvas>
+                </div>
+                
+                <div class="card">
+                    <h3>📈 Progreso por Categoría</h3>
+                    <canvas id="categoriaChart"></canvas>
+                </div>
+                
+                <div class="card full-width">
+                    <h3>📋 Resumen de Estadísticas</h3>
+                    <div id="statsContainer" class="stats-grid">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasks Tab -->
+        <div id="tasks" class="tab-content">
+            <div class="card">
+                <div class="task-controls">
+                    <h3>📋 Lista de Tareas</h3>
+                    <div class="filters">
+                        <select id="auditorFilter">
+                            <option value="">Todos los auditores</option>
+                            <option value="Auditor 1">Auditor 1</option>
+                            <option value="Auditor 2">Auditor 2</option>
+                            <option value="Auditor 3">Auditor 3</option>
+                            <option value="Auditor 4">Auditor 4</option>
+                        </select>
+                        <select id="categoriaFilter">
+                            <option value="">Todas las categorías</option>
+                            <option value="Auditorías y trabajos adicionales">Auditorías y trabajos adicionales</option>
+                            <option value="Auditoría continua">Auditoría continua</option>
+                            <option value="Seguimiento de observaciones internas">Seguimiento de observaciones internas</option>
+                            <option value="Seguimiento de observaciones regulatorias">Seguimiento de observaciones regulatorias</option>
+                            <option value="Reportes SIRAI">Reportes SIRAI</option>
+                            <option value="Capacitaciones">Capacitaciones</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="tasksTable">
+                        <thead>
+                            <tr>
+                                <th>Auditor</th>
+                                <th>Categoría</th>
+                                <th>Subtarea</th>
+                                <th>Progreso</th>
+                                <th>Comentario</th>
+                                <th>Última Act.</th>
+                                <th>Acciones</th>
+                                <th>Revisión del Jefe</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Se llena dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Task Tab -->
+        <div id="add-task" class="tab-content">
+            <div class="card">
+                <h3>➕ Registrar Nueva Tarea</h3>
+                <form id="taskForm" class="task-form">
+                    <div class="form-group">
+                        <label for="auditor">👤 Auditor:</label>
+                        <select id="auditor" required>
+                            <option value="">Seleccionar auditor</option>
+                            <option value="Auditor 1">Auditor 1</option>
+                            <option value="Auditor 2">Auditor 2</option>
+                            <option value="Auditor 3">Auditor 3</option>
+                            <option value="Auditor 4">Auditor 4</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="categoria">📁 Categoría:</label>
+                        <select id="categoria" required>
+                            <option value="">Seleccionar categoría</option>
+                            <option value="Auditorías y trabajos adicionales">Auditorías y trabajos adicionales</option>
+                            <option value="Auditoría continua">Auditoría continua</option>
+                            <option value="Seguimiento de observaciones internas">Seguimiento de observaciones internas</option>
+                            <option value="Seguimiento de observaciones regulatorias">Seguimiento de observaciones regulatorias</option>
+                            <option value="Reportes SIRAI">Reportes SIRAI</option>
+                            <option value="Capacitaciones">Capacitaciones</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="subtarea">📝 Subtarea:</label>
+                        <input type="text" id="subtarea" placeholder="Nombre de la subtarea" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="porcentaje">📊 Porcentaje de Avance:</label>
+                        <div class="slider-container">
+                            <input type="range" id="porcentaje" min="0" max="100" value="0" class="slider">
+                            <span id="porcentajeValue" class="slider-value">0%</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="comentario">💬 Comentario (opcional):</label>
+                        <textarea id="comentario" placeholder="Comentarios adicionales..." rows="3"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" id="cancelBtn" class="btn btn-secondary">❌ Cancelar</button>
+                        <button type="submit" class="btn btn-primary">💾 Guardar Tarea</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para editar tareas -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✏️ Editar Tarea</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="editForm">
+                <input type="hidden" id="editTaskId">
+                <div class="form-group">
+                    <label for="editPorcentaje">📊 Porcentaje de Avance:</label>
+                    <div class="slider-container">
+                        <input type="range" id="editPorcentaje" min="0" max="100" value="0" class="slider">
+                        <span id="editPorcentajeValue" class="slider-value">0%</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editComentario">💬 Comentario:</label>
+                    <textarea id="editComentario" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">❌ Cancelar</button>
+                    <button type="submit" class="btn btn-primary">💾 Actualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Agrega este modal después del modal existente de editar tareas -->
+    <div id="revisionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>👨‍💼 Revisión del Jefe</h3>
+                <span class="close-revision">&times;</span>
+            </div>
+            <div class="task-info">
+                <p><strong>Auditor:</strong> <span id="revisionAuditor"></span></p>
+                <p><strong>Subtarea:</strong> <span id="revisionSubtarea"></span></p>
+                <p><strong>Progreso:</strong> <span id="revisionProgreso"></span></p>
+            </div>
+            <form id="revisionForm">
+                <input type="hidden" id="revisionTaskId">
+                <div class="form-group">
+                    <label for="auditorRevisor">👨‍💼 Auditor Revisor:</label>
+                    <input type="text" id="auditorRevisor" value="Manuel Nuñez" required>
+                </div>
+                <div class="form-group">
+                    <label for="revisionComentario">💬 Comentario de Revisión:</label>
+                    <textarea id="revisionComentario" rows="4" placeholder="Deja aquí tu comentario, observaciones o visto bueno..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeRevisionModal()">❌ Cancelar</button>
+                    <button type="submit" class="btn btn-success">✅ Guardar Revisión</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
