@@ -147,7 +147,8 @@ async function handleAddTask(event) {
         categoria: document.getElementById('categoria').value,
         subtarea: document.getElementById('subtarea').value,
         porcentaje: parseInt(document.getElementById('porcentaje').value),
-        comentario: document.getElementById('comentario').value
+        comentario: document.getElementById('comentario').value,
+        fecha_estimada_fin: document.getElementById('fechaEstimadaFin').value || null
     };
 
     // Validación
@@ -196,7 +197,6 @@ async function handleEditTask(event) {
         showNotification('Error al actualizar la tarea', 'error');
     }
 }
-
 // Eliminar tarea
 async function deleteTask(taskId) {
     if (!confirm('¿Estás seguro de que deseas eliminar esta tarea?')) {
@@ -218,6 +218,7 @@ async function deleteTask(taskId) {
 }
 
 // Renderizar tabla de tareas
+// Actualizar la función renderTasksTable para mostrar la fecha estimada:
 function renderTasksTable() {
     const tbody = document.querySelector('#tasksTable tbody');
     const auditorFilter = document.getElementById('auditorFilter').value;
@@ -237,6 +238,13 @@ function renderTasksTable() {
     
     filteredTasks.forEach(task => {
         const row = document.createElement('tr');
+        
+        // Crear el contenido de la revisión
+        const revisionContent = createRevisionContent(task);
+        
+        // Calcular estado de la fecha
+        const fechaEstimadaContent = createFechaEstimadaContent(task);
+        
         row.innerHTML = `
             <td>${task.auditor}</td>
             <td>${task.categoria}</td>
@@ -248,13 +256,15 @@ function renderTasksTable() {
                 </div>
             </td>
             <td>${task.comentario || '-'}</td>
+            <td>${fechaEstimadaContent}</td>
             <td>${formatDate(task.fecha_actualizacion)}</td>
             <td>
                 <div class="action-buttons">
-                    <button class="btn btn-small btn-primary" onclick="editTask(${task.id})">✏️</button>
-                    <button class="btn btn-small btn-danger" onclick="deleteTask(${task.id})">🗑️</button>
+                    <button class="btn btn-small btn-primary" onclick="editTask(${task.id})" title="Editar tarea">✏️</button>
+                    <button class="btn btn-small btn-danger" onclick="deleteTask(${task.id})" title="Eliminar tarea">🗑️</button>
                 </div>
             </td>
+            <td class="revision-cell">${revisionContent}</td>
         `;
         tbody.appendChild(row);
     });
@@ -285,41 +295,91 @@ function renderAuditorChart(auditorStats) {
         auditorChart.destroy();
     }
     
+    // Ordenar por puntuación global
+    const sortedStats = [...auditorStats].sort((a, b) => b.puntuacion_global - a.puntuacion_global);
+    
     const data = {
-        labels: auditorStats.map(stat => stat.auditor),
-        datasets: [{
-            label: 'Promedio de Avance (%)',
-            data: auditorStats.map(stat => stat.promedio_avance || 0),
-            backgroundColor: [
-                'rgba(52, 152, 219, 0.8)',
-                'rgba(46, 204, 113, 0.8)',
-                'rgba(241, 196, 15, 0.8)',
-                'rgba(231, 76, 60, 0.8)'
-            ],
-            borderColor: [
-                'rgba(52, 152, 219, 1)',
-                'rgba(46, 204, 113, 1)',
-                'rgba(241, 196, 15, 1)',
-                'rgba(231, 76, 60, 1)'
-            ],
-            borderWidth: 2
-        }]
+        labels: sortedStats.map(stat => stat.auditor),
+        datasets: [
+            {
+                label: 'Puntuación Global',
+                data: sortedStats.map(stat => stat.puntuacion_global),
+                backgroundColor: sortedStats.map(stat => {
+                    if (stat.puntuacion_global >= 85) return 'rgba(46, 204, 113, 0.8)'; // Verde - Excelente
+                    if (stat.puntuacion_global >= 70) return 'rgba(52, 152, 219, 0.8)'; // Azul - Bueno
+                    if (stat.puntuacion_global >= 50) return 'rgba(241, 196, 15, 0.8)'; // Amarillo - Regular
+                    return 'rgba(231, 76, 60, 0.8)'; // Rojo - Necesita mejora
+                }),
+                borderColor: sortedStats.map(stat => {
+                    if (stat.puntuacion_global >= 85) return 'rgba(46, 204, 113, 1)';
+                    if (stat.puntuacion_global >= 70) return 'rgba(52, 152, 219, 1)';
+                    if (stat.puntuacion_global >= 50) return 'rgba(241, 196, 15, 1)';
+                    return 'rgba(231, 76, 60, 1)';
+                }),
+                borderWidth: 2
+            },
+            {
+                label: 'Índice de Rendimiento',
+                data: sortedStats.map(stat => Math.min(100, stat.indice_rendimiento_ponderado)),
+                backgroundColor: 'rgba(155, 89, 182, 0.6)',
+                borderColor: 'rgba(155, 89, 182, 1)',
+                borderWidth: 1
+            },
+            {
+                label: 'Cumplimiento de Plazos',
+                data: sortedStats.map(stat => stat.indice_cumplimiento_plazos),
+                backgroundColor: 'rgba(26, 188, 156, 0.6)',
+                borderColor: 'rgba(26, 188, 156, 1)',
+                borderWidth: 1
+            }
+        ]
     };
 
     auditorChart = new Chart(ctx, {
-        type: 'doughnut',
+        type: 'bar',
         data: data,
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            indexAxis: 'y', // Hace las barras horizontales
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Puntuación (%)'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Auditores'
+                    }
+                }
+            },
             plugins: {
                 legend: {
-                    position: 'bottom'
+                    position: 'top'
                 },
                 tooltip: {
                     callbacks: {
-                        label: function(context) {
-                            return context.label + ': ' + Math.round(context.parsed) + '%';
+                        afterLabel: function(context) {
+                            const auditor = sortedStats[context.dataIndex];
+                            if (context.datasetIndex === 0) { // Solo mostrar en la primera serie
+                                return [
+                                    `Nivel: ${auditor.nivel_rendimiento}`,
+                                    `Tareas: ${auditor.total_tareas} (${auditor.tareas_completadas} completadas)`,
+                                    `Días prom. completar: ${auditor.dias_promedio_completar}`,
+                                    `Tareas vencidas: ${auditor.tareas_vencidas}`
+                                ];
+                            }
+                            return null;
                         }
                     }
                 }
@@ -327,6 +387,7 @@ function renderAuditorChart(auditorStats) {
         }
     });
 }
+
 
 function renderCategoriaChart(categoriaStats) {
     const ctx = document.getElementById('categoriaChart').getContext('2d');
@@ -336,14 +397,26 @@ function renderCategoriaChart(categoriaStats) {
     }
     
     const data = {
-        labels: categoriaStats.map(stat => stat.categoria),
-        datasets: [{
-            label: 'Promedio de Avance (%)',
-            data: categoriaStats.map(stat => stat.promedio_avance || 0),
-            backgroundColor: 'rgba(52, 152, 219, 0.8)',
-            borderColor: 'rgba(52, 152, 219, 1)',
-            borderWidth: 2
-        }]
+        labels: categoriaStats.map(stat => stat.categoria.length > 20 ? 
+            stat.categoria.substring(0, 20) + '...' : stat.categoria),
+        datasets: [
+            {
+                label: 'Progreso Promedio (%)',
+                data: categoriaStats.map(stat => stat.promedio_avance || 0),
+                backgroundColor: 'rgba(52, 152, 219, 0.8)',
+                borderColor: 'rgba(52, 152, 219, 1)',
+                borderWidth: 2,
+                yAxisID: 'y'
+            },
+            {
+                label: 'Cumplimiento de Plazos (%)',
+                data: categoriaStats.map(stat => stat.cumplimiento_plazos || 0),
+                backgroundColor: 'rgba(46, 204, 113, 0.8)',
+                borderColor: 'rgba(46, 204, 113, 1)',
+                borderWidth: 2,
+                yAxisID: 'y'
+            }
+        ]
     };
 
     categoriaChart = new Chart(ctx, {
@@ -354,12 +427,19 @@ function renderCategoriaChart(categoriaStats) {
             maintainAspectRatio: false,
             scales: {
                 y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
                     beginAtZero: true,
                     max: 100,
                     ticks: {
                         callback: function(value) {
                             return value + '%';
                         }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Porcentaje (%)'
                     }
                 },
                 x: {
@@ -371,12 +451,16 @@ function renderCategoriaChart(categoriaStats) {
             },
             plugins: {
                 legend: {
-                    display: false
+                    position: 'top'
                 },
                 tooltip: {
                     callbacks: {
-                        label: function(context) {
-                            return 'Promedio: ' + Math.round(context.parsed.y) + '%';
+                        afterLabel: function(context) {
+                            const categoria = categoriaStats[context.dataIndex];
+                            return [
+                                `Total tareas: ${categoria.total_tareas}`,
+                                `Completadas: ${categoria.tareas_completadas}`
+                            ];
                         }
                     }
                 }
@@ -390,33 +474,98 @@ function renderStats(stats) {
     const container = document.getElementById('statsContainer');
     container.innerHTML = '';
     
-    // Estadísticas generales
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(task => task.porcentaje === 100).length;
-    const averageProgress = totalTasks > 0 ? tasks.reduce((sum, task) => sum + task.porcentaje, 0) / totalTasks : 0;
+    const globalStats = stats.globalStats || {};
     
+    // Crear grid de estadísticas mejorado
     const statsHTML = `
         <div class="stat-item">
-            <div class="stat-number">${totalTasks}</div>
+            <div class="stat-number">${globalStats.total_tareas}</div>
             <div class="stat-label">Total de Tareas</div>
         </div>
         <div class="stat-item">
-            <div class="stat-number">${completedTasks}</div>
+            <div class="stat-number">${globalStats.tareas_completadas}</div>
             <div class="stat-label">Tareas Completadas</div>
+            <div class="stat-detail">${globalStats.porcentaje_completadas_global}% del total</div>
         </div>
         <div class="stat-item">
-            <div class="stat-number">${Math.round(averageProgress)}%</div>
+            <div class="stat-number">${Math.round(globalStats.promedio_avance_global)}%</div>
             <div class="stat-label">Progreso Promedio</div>
         </div>
-        <div class="stat-item">
-            <div class="stat-number">${CATEGORIAS.length}</div>
-            <div class="stat-label">Categorías Activas</div>
+        <div class="stat-item ${globalStats.avance_ponderado_tiempo < 80 ? 'stat-attention' : ''}">
+            <div class="stat-number">${Math.round(globalStats.avance_ponderado_tiempo)}%</div>
+            <div class="stat-label">Eficiencia Temporal</div>
+            <div class="stat-detail">Avance vs. tiempo esperado</div>
+        </div>
+        <div class="stat-item ${globalStats.cumplimiento_plazos_global < 80 ? 'stat-warning' : ''}">
+            <div class="stat-number">${globalStats.cumplimiento_plazos_global}%</div>
+            <div class="stat-label">Cumplimiento de Plazos</div>
+            <div class="stat-detail">${globalStats.tareas_con_fecha} tareas con fecha</div>
+        </div>
+        <div class="stat-item ${globalStats.tareas_vencidas > 0 ? 'stat-danger' : ''}">
+            <div class="stat-number">${globalStats.tareas_vencidas}</div>
+            <div class="stat-label">Tareas Vencidas</div>
+            <div class="stat-detail">Requieren atención inmediata</div>
+        </div>
+        <div class="stat-item ${globalStats.tareas_proximas_vencer > 0 ? 'stat-warning' : ''}">
+            <div class="stat-number">${globalStats.tareas_proximas_vencer}</div>
+            <div class="stat-label">Próximas a Vencer</div>
+            <div class="stat-detail">En los próximos 7 días</div>
         </div>
     `;
     
     container.innerHTML = statsHTML;
+    
+    // Agregar tabla de ranking de auditores
+    renderAuditorRanking(stats.auditorStats);
 }
 
+function renderAuditorRanking(auditorStats) {
+    const container = document.getElementById('statsContainer');
+    
+    // Crear tabla de ranking
+    const rankingHTML = `
+        <div class="ranking-section">
+            <h4>🏆 Ranking de Rendimiento por Auditor</h4>
+            <div class="ranking-table">
+                <table class="ranking-table-inner">
+                    <thead>
+                        <tr>
+                            <th>Pos.</th>
+                            <th>Auditor</th>
+                            <th>Puntuación Global</th>
+                            <th>Rendimiento</th>
+                            <th>Cumplimiento</th>
+                            <th>Nivel</th>
+                            <th>Tareas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${auditorStats.map((auditor, index) => `
+                            <tr class="ranking-row ${auditor.puntuacion_global >= 85 ? 'excellent' : 
+                                                    auditor.puntuacion_global >= 70 ? 'good' : 
+                                                    auditor.puntuacion_global >= 50 ? 'regular' : 'needs-improvement'}">
+                                <td class="rank-position">${index + 1}</td>
+                                <td class="auditor-name">${auditor.auditor}</td>
+                                <td class="score-cell">
+                                    <div class="score-bar">
+                                        <div class="score-fill" style="width: ${auditor.puntuacion_global}%"></div>
+                                        <span class="score-text">${Math.round(auditor.puntuacion_global)}%</span>
+                                    </div>
+                                </td>
+                                <td>${Math.round(auditor.indice_rendimiento_ponderado)}%</td>
+                                <td>${Math.round(auditor.indice_cumplimiento_plazos)}%</td>
+                                <td class="level-badge ${auditor.nivel_rendimiento.toLowerCase().replace(' ', '-')}">${auditor.nivel_rendimiento}</td>
+                                <td>${auditor.tareas_completadas}/${auditor.total_tareas}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML += rankingHTML;
+}
 // Funciones auxiliares
 function formatDate(dateString) {
     const date = new Date(dateString);
@@ -432,6 +581,7 @@ function formatDate(dateString) {
 function clearForm() {
     document.getElementById('taskForm').reset();
     document.getElementById('porcentajeValue').textContent = '0%';
+    document.getElementById('fechaEstimadaFin').value = '';
 }
 
 function filterTasks() {
@@ -498,6 +648,61 @@ function showNotification(message, type = 'info') {
         }, 300);
     }, 3000);
 }
+
+function createFechaEstimadaContent(task) {
+    if (!task.fecha_estimada_fin) {
+        return '<span class="no-date">Sin fecha</span>';
+    }
+
+    const fechaEstimada = new Date(task.fecha_estimada_fin);
+    const hoy = new Date();
+    const fechaCreacion = new Date(task.fecha_creacion);
+
+    let diasRestantes = Math.ceil((fechaEstimada - hoy) / (1000 * 60 * 60 * 24));
+    let progresoEsperado;
+
+    if (fechaCreacion > fechaEstimada) {
+        progresoEsperado = 100;
+    } else {
+        const diasTotales = Math.ceil((fechaEstimada - fechaCreacion) / (1000 * 60 * 60 * 24));
+        const diasTranscurridos = Math.ceil((hoy - fechaCreacion) / (1000 * 60 * 60 * 24));
+        progresoEsperado = diasTotales > 0 
+            ? Math.min(100, Math.max(0, (diasTranscurridos / diasTotales) * 100))
+            : 100;
+    }
+
+    let statusClass = '';
+    let statusIcon = '';
+
+    if (task.porcentaje === 100) {
+        statusClass = 'fecha-completada'; // Verde
+        statusIcon = '✅';
+    } else if (diasRestantes < 0 || diasRestantes <= 2) {
+        statusClass = 'fecha-vencida'; // Rojo
+        statusIcon = '🔴';
+    } else if (diasRestantes <= 7) {
+        statusClass = 'fecha-proxima'; // Amarillo
+        statusIcon = '🟡';
+    } else {
+        statusClass = 'fecha-normal'; // Azul u otro estilo
+        statusIcon = '📅';
+    }
+
+    return `
+        <div class="fecha-estimada ${statusClass}">
+            <div class="fecha-display">
+                ${statusIcon} ${formatDate(task.fecha_estimada_fin)}
+            </div>
+            <div class="fecha-info">
+                <div><small>Esperado: ${Math.round(progresoEsperado)}%</small></div>
+                <div><small>Quedan: ${diasRestantes} días</small></div>
+
+            </div>
+        </div>
+    `;
+}
+
+
 // Función para manejar la revisión del jefe
 async function handleRevision(event) {
     event.preventDefault();
@@ -551,53 +756,6 @@ function closeRevisionModal() {
     document.getElementById('revisionModal').style.display = 'none';
 }
 
-// Actualiza la función renderTasksTable para incluir la columna de revisión
-function renderTasksTable() {
-    const tbody = document.querySelector('#tasksTable tbody');
-    const auditorFilter = document.getElementById('auditorFilter').value;
-    const categoriaFilter = document.getElementById('categoriaFilter').value;
-    
-    let filteredTasks = tasks;
-    
-    if (auditorFilter) {
-        filteredTasks = filteredTasks.filter(task => task.auditor === auditorFilter);
-    }
-    
-    if (categoriaFilter) {
-        filteredTasks = filteredTasks.filter(task => task.categoria === categoriaFilter);
-    }
-    
-    tbody.innerHTML = '';
-    
-    filteredTasks.forEach(task => {
-        const row = document.createElement('tr');
-        
-        // Crear el contenido de la revisión
-        const revisionContent = createRevisionContent(task);
-        
-        row.innerHTML = `
-            <td>${task.auditor}</td>
-            <td>${task.categoria}</td>
-            <td>${task.subtarea}</td>
-            <td>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${task.porcentaje}%"></div>
-                    <div class="progress-text">${task.porcentaje}%</div>
-                </div>
-            </td>
-            <td>${task.comentario || '-'}</td>
-            <td>${formatDate(task.fecha_actualizacion)}</td>
-            <td>
-                <div class="action-buttons">
-                    <button class="btn btn-small btn-primary" onclick="editTask(${task.id})" title="Editar tarea">✏️</button>
-                    <button class="btn btn-small btn-danger" onclick="deleteTask(${task.id})" title="Eliminar tarea">🗑️</button>
-                </div>
-            </td>
-            <td class="revision-cell">${revisionContent}</td>
-        `;
-        tbody.appendChild(row);
-    });
-}
 
 // Función para crear el contenido de la revisión
 function createRevisionContent(task) {
@@ -647,4 +805,17 @@ function createRevisionContent(task) {
         </div>
     `;
 }
+
+// Agregar estilos de animación para notificaciones
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+`;
 document.head.appendChild(style);

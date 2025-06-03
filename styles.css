@@ -752,3 +752,444 @@ canvas {
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
+
+/* Agrega estos estilos al final de tu archivo styles.css */
+
+/* Estilos para el campo de fecha */
+.date-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.date-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.form-help {
+    display: block;
+    color: #7f8c8d;
+    font-size: 0.85em;
+    margin-top: 4px;
+}
+
+/* Estilos para mostrar fechas estimadas en la tabla */
+.fecha-estimada {
+    font-size: 0.9em;
+    padding: 4px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.fecha-estimada.fecha-completada {
+    background: rgba(46, 204, 113, 0.1);
+    border-left: 3px solid #2ecc71;
+}
+
+.fecha-estimada.fecha-vencida {
+    background: rgba(231, 76, 60, 0.1);
+    border-left: 3px solid #e74c3c;
+    animation: subtle-pulse 2s infinite;
+}
+
+.fecha-estimada.fecha-proxima {
+    background: rgba(241, 196, 15, 0.1);
+    border-left: 3px solid #f1c40f;
+}
+
+.fecha-estimada.fecha-normal {
+    background: rgba(52, 152, 219, 0.1);
+    border-left: 3px solid #3498db;
+}
+
+.fecha-display {
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.fecha-info {
+    color: #7f8c8d;
+}
+
+.no-date {
+    color: #bdc3c7;
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+/* Estilos para las estadísticas mejoradas */
+.stat-item.stat-warning {
+    background: rgba(231, 76, 60, 0.1);
+    border-left: 4px solid #e74c3c;
+}
+
+.stat-item.stat-warning .stat-number {
+    color: #e74c3c;
+}
+
+.stat-item.stat-attention {
+    background: rgba(241, 196, 15, 0.1);
+    border-left: 4px solid #f1c40f;
+}
+
+.stat-item.stat-attention .stat-number {
+    color: #f39c12;
+}
+
+/* Mejorar la tabla para acomodar la nueva columna */
+#tasksTable th:nth-child(6),
+#tasksTable td:nth-child(6) {
+    min-width: 150px;
+    width: 150px;
+}
+
+/* Responsive para la nueva columna */
+@media (max-width: 1400px) {
+    .fecha-info {
+        display: inline;
+    }
+    
+    #tasksTable th:nth-child(6),
+    #tasksTable td:nth-child(6) {
+        min-width: 120px;
+        width: 120px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .fecha-estimada {
+        font-size: 0.8em;
+    }
+    
+    #tasksTable th:nth-child(6),
+    #tasksTable td:nth-child(6) {
+        min-width: 100px;
+        width: 100px;
+    }
+}
+
+/* Agregar estos estilos al archivo styles.css existente */
+
+/* Estadísticas mejoradas */
+.stat-item {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-left: 4px solid #3498db;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.stat-item.stat-warning {
+    border-left-color: #f39c12;
+    background: linear-gradient(135deg, #fff 0%, #fef9e7 100%);
+}
+
+.stat-item.stat-danger {
+    border-left-color: #e74c3c;
+    background: linear-gradient(135deg, #fff 0%, #fdedec 100%);
+}
+
+.stat-item.stat-attention {
+    border-left-color: #ff6b35;
+    background: linear-gradient(135deg, #fff 0%, #fef5f0 100%);
+}
+
+.stat-number {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 1em;
+    color: #34495e;
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.stat-detail {
+    font-size: 0.8em;
+    color: #7f8c8d;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* Ranking de auditores */
+.ranking-section {
+    grid-column: 1 / -1;
+    margin-top: 30px;
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.ranking-section h4 {
+    margin-bottom: 20px;
+    color: #2c3e50;
+    font-size: 1.2em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ranking-table {
+    overflow-x: auto;
+}
+
+.ranking-table-inner {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.ranking-table-inner th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px 8px;
+    text-align: left;
+    font-weight: 600;
+    border: none;
+    font-size: 0.85em;
+}
+
+.ranking-table-inner th:first-child {
+    border-radius: 8px 0 0 0;
+    text-align: center;
+}
+
+.ranking-table-inner th:last-child {
+    border-radius: 0 8px 0 0;
+}
+
+.ranking-table-inner td {
+    padding: 12px 8px;
+    border-bottom: 1px solid #ecf0f1;
+    vertical-align: middle;
+}
+
+.ranking-row {
+    transition: background-color 0.2s;
+}
+
+.ranking-row:hover {
+    background-color: #f8f9fa;
+}
+
+.ranking-row.excellent {
+    background: linear-gradient(90deg, rgba(46, 204, 113, 0.1) 0%, transparent 100%);
+}
+
+.ranking-row.good {
+    background: linear-gradient(90deg, rgba(52, 152, 219, 0.1) 0%, transparent 100%);
+}
+
+.ranking-row.regular {
+    background: linear-gradient(90deg, rgba(241, 196, 15, 0.1) 0%, transparent 100%);
+}
+
+.ranking-row.needs-improvement {
+    background: linear-gradient(90deg, rgba(231, 76, 60, 0.1) 0%, transparent 100%);
+}
+
+.rank-position {
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #2c3e50;
+    width: 50px;
+}
+
+.auditor-name {
+    font-weight: 600;
+    color: #2c3e50;
+    min-width: 120px;
+}
+
+.score-cell {
+    min-width: 120px;
+}
+
+.score-bar {
+    position: relative;
+    background: #ecf0f1;
+    border-radius: 20px;
+    height: 24px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.score-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    transition: width 0.8s ease-in-out;
+}
+
+.score-text {
+    position: relative;
+    z-index: 2;
+    color: white;
+    font-weight: bold;
+    font-size: 0.8em;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.level-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.level-badge.excelente {
+    background: linear-gradient(135deg, #2ecc71, #27ae60);
+    color: white;
+}
+
+.level-badge.bueno {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+}
+
+.level-badge.regular {
+    background: linear-gradient(135deg, #f1c40f, #f39c12);
+    color: white;
+}
+
+.level-badge.necesita-mejora {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+}
+
+/* Mejoras para el grid de estadísticas */
+#statsContainer {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+/* Animaciones para barras de progreso */
+@keyframes fillBar {
+    from {
+        width: 0%;
+    }
+    to {
+        width: var(--target-width);
+    }
+}
+
+.score-fill {
+    animation: fillBar 1.5s ease-out;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .ranking-table-inner {
+        font-size: 0.8em;
+    }
+    
+    .ranking-table-inner th,
+    .ranking-table-inner td {
+        padding: 8px 4px;
+    }
+    
+    .stat-item {
+        padding: 15px;
+    }
+    
+    .stat-number {
+        font-size: 2em;
+    }
+    
+    #statsContainer {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ranking-section {
+        padding: 15px;
+        margin-top: 20px;
+    }
+    
+    .ranking-table-inner th,
+    .ranking-table-inner td {
+        padding: 6px 3px;
+        font-size: 0.7em;
+    }
+    
+    .score-bar {
+        height: 20px;
+    }
+    
+    .level-badge {
+        font-size: 0.65em;
+        padding: 3px 8px;
+    }
+}
+
+/* Mejoras adicionales para mejor UX */
+.stat-item.stat-warning:hover {
+    border-left-color: #e67e22;
+}
+
+.stat-item.stat-danger:hover {
+    border-left-color: #c0392b;
+}
+
+.stat-item.stat-attention:hover {
+    border-left-color: #d35400;
+}
+
+/* Indicadores visuales para diferentes rangos de puntuación */
+.score-fill[style*="width: 100%"],
+.score-fill[style*="width: 9"],
+.score-fill[style*="width: 8"] {
+    background: linear-gradient(90deg, #2ecc71, #27ae60) !important;
+}
+
+.score-fill[style*="width: 7"],
+.score-fill[style*="width: 6"] {
+    background: linear-gradient(90deg, #3498db, #2980b9) !important;
+}
+
+.score-fill[style*="width: 5"],
+.score-fill[style*="width: 4"] {
+    background: linear-gradient(90deg, #f1c40f, #f39c12) !important;
+}
+
+/* Efectos de hover para la tabla */
+.ranking-row:hover .score-fill {
+    filter: brightness(1.1);
+}
+
+.ranking-row:hover .level-badge {
+    transform: scale(1.05);
+    transition: transform 0.2s;
+}
+
+
+
