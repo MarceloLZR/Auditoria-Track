@@ -675,3 +675,80 @@ canvas {
         max-width: 100px;
     }
 }
+
+/* Indicador de edición que requiere nueva revisión */
+.edit-indicator {
+    font-size: 0.8em;
+    color: #f39c12;
+    font-weight: bold;
+    margin: 2px 0;
+    padding: 2px 6px;
+    background: rgba(243, 156, 18, 0.1);
+    border-radius: 3px;
+    border-left: 3px solid #f39c12;
+}
+
+/* Estilos para revisiones desactualizadas */
+.revision-preview-outdated {
+    font-size: 0.85em;
+    color: #7f8c8d;
+    margin: 2px 0;
+    font-style: italic;
+    opacity: 0.7;
+    text-decoration: line-through;
+}
+
+.revision-info-outdated {
+    font-size: 0.75em;
+    color: #95a5a6;
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+
+/* Mejorar el estado pendiente para que sea más visible */
+.revision-status.pendiente {
+    background: rgba(241, 196, 15, 0.1);
+    border-left: 3px solid #f1c40f;
+}
+
+.revision-status.pendiente .revision-badge {
+    color: #f39c12;
+}
+
+/* Animación sutil para estados que requieren atención */
+.revision-status.pendiente {
+    animation: subtle-pulse 2s infinite;
+}
+
+@keyframes subtle-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+/* Mejorar el botón de revisión para estado pendiente */
+.revision-button {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: all 0.3s ease;
+}
+
+.revision-content:has(.revision-status.pendiente) .revision-button {
+    background: #f39c12;
+    animation: gentle-glow 3s infinite;
+}
+
+@keyframes gentle-glow {
+    0%, 100% { box-shadow: 0 0 5px rgba(243, 156, 18, 0.3); }
+    50% { box-shadow: 0 0 10px rgba(243, 156, 18, 0.6); }
+}
+
+.revision-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}

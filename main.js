@@ -7,8 +7,8 @@ let mainWindow;
 let db;
 
 // ✅ Carpeta compartida (por ejemplo, C:/AuditoriaData)
-const dataDir = '\\\\b200603sv214\\groupscentral$\\Map_W\\GGBP200_Auditoria_Compartido\\2025\\CODIGOS\\DB\\AuditoriaData';
-//const dataDir = path.join('C:', 'AuditoriaData');
+//const dataDir = '\\\\b200603sv214\\groupscentral$\\Map_W\\GGBP200_Auditoria_Compartido\\2025\\CODIGOS\\DB\\AuditoriaData';
+const dataDir = path.join('C:', 'AuditoriaData');
 
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -130,11 +130,17 @@ ipcMain.handle('add-task', (event, task) => {
   }
 });
 
+
 ipcMain.handle('update-task', (event, id, updates) => {
   try {
     const stmt = db.prepare(`
       UPDATE tasks 
-      SET porcentaje = ?, comentario = ?, fecha_actualizacion = CURRENT_TIMESTAMP
+      SET porcentaje = ?, 
+          comentario = ?, 
+          fecha_actualizacion = CURRENT_TIMESTAMP,
+          revision_jefe = NULL,
+          fecha_revision = NULL,
+          estado_revision = 'pendiente'
       WHERE id = ?
     `);
     const result = stmt.run(updates.porcentaje, updates.comentario, id);

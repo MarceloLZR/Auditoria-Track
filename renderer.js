@@ -185,7 +185,7 @@ async function handleEditTask(event) {
     try {
         const result = await ipcRenderer.invoke('update-task', parseInt(taskId), updates);
         if (result.success) {
-            showNotification('Tarea actualizada exitosamente', 'success');
+            showNotification('Tarea actualizada exitosamente. La revisión se ha reiniciado.', 'success');
             closeEditModal();
             loadTasks();
         } else {
@@ -610,14 +610,23 @@ function createRevisionContent(task) {
     let statusIcon = estado === 'revisado' ? '✅' : '⏳';
     let statusText = estado === 'revisado' ? 'Revisado' : 'Pendiente';
     
+    // Si fue editada después de la revisión, mostrar un indicador especial
+    let editIndicator = '';
+    if (estado === 'pendiente' && fechaRevision) {
+        editIndicator = '<div class="edit-indicator">🔄 Requiere nueva revisión</div>';
+    }
+    
     let preview = '';
     if (revision && revision.length > 0) {
-        preview = `<div class="revision-preview">${revision.substring(0, 60)}${revision.length > 60 ? '...' : ''}</div>`;
+        // Si está pendiente pero hay comentario previo, mostrarlo con opacidad reducida
+        const previewClass = estado === 'pendiente' ? 'revision-preview-outdated' : 'revision-preview';
+        preview = `<div class="${previewClass}">${revision.substring(0, 60)}${revision.length > 60 ? '...' : ''}</div>`;
     }
     
     let fechaInfo = '';
     if (fechaRevision) {
-        fechaInfo = `<div class="revision-info">📅 ${formatDate(fechaRevision)}</div>`;
+        const fechaClass = estado === 'pendiente' ? 'revision-info-outdated' : 'revision-info';
+        fechaInfo = `<div class="${fechaClass}">📅 ${formatDate(fechaRevision)}</div>`;
     }
     
     return `
@@ -629,6 +638,7 @@ function createRevisionContent(task) {
                 </div>
                 <small>por ${auditorRevisor}</small>
             </div>
+            ${editIndicator}
             ${preview}
             ${fechaInfo}
             <button class="revision-button" onclick="openRevisionModal(${task.id})">
@@ -637,16 +647,4 @@ function createRevisionContent(task) {
         </div>
     `;
 }
-// Agregar estilos de animación para notificaciones
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes slideOut {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
-    }
-`;
 document.head.appendChild(style);
