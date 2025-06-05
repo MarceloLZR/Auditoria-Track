@@ -76,12 +76,13 @@ El ejecutable portable se generará en la carpeta `dist/`
 - Comentarios opcionales
 
 ### 2. Categorías Predefinidas
-1. Auditorías y trabajos adicionales
+1. Auditorías 
 2. Auditoría continua
 3. Seguimiento de observaciones internas
 4. Seguimiento de observaciones regulatorias
 5. Reportes SIRAI
 6. Capacitaciones
+7. Trabajos adicionales
 
 ### 3. Dashboard Visual
 - Gráfico de dona: Progreso por auditor

@@ -7,15 +7,24 @@ let categoriaChart = null;
 
 // Categorías predefinidas
 const CATEGORIAS = [
-    'Auditorías y trabajos adicionales',
+    'Auditorías',
     'Auditoría continua', 
     'Seguimiento de observaciones internas',
     'Seguimiento de observaciones regulatorias',
     'Reportes SIRAI',
-    'Capacitaciones'
+    'Capacitaciones',
+    'Trabajos adicionales'
 ];
 
 const AUDITORES = ['Priscila Pajuelo', 'Monica Bilbao', 'Marcelo Nuñez', 'Lautaro Ballesteros'];
+
+const PERIODOS = [
+    { value: 'Q1', label: 'Q1 (Nov-Ene)' },
+    { value: 'Q2', label: 'Q2 (Feb-Abr)' },
+    { value: 'Q3', label: 'Q3 (May-Jul)' },
+    { value: 'Q4', label: 'Q4 (Ago-Oct)' }
+];
+
 
 function actualizarSelectAuditores() {
     const selects = [
@@ -45,7 +54,8 @@ function actualizarSelectAuditores() {
 // Inicialización
 document.addEventListener('DOMContentLoaded', function() {
     initializeEventListeners();
-    actualizarSelectAuditores(); // 👈 AÑADE ESTA LÍNEA
+    actualizarSelectAuditores(); 
+    actualizarFiltros();// 👈 AÑADE ESTA LÍNEA
     loadTasks();
     showTab('dashboard');
 });
@@ -81,6 +91,7 @@ function initializeEventListeners() {
     // Filtros
     document.getElementById('auditorFilter').addEventListener('change', filterTasks);
     document.getElementById('categoriaFilter').addEventListener('change', filterTasks);
+    document.getElementById('periodoFilter').addEventListener('change', filterTasks);
 
     // Modal
     document.querySelector('.close').addEventListener('click', closeEditModal);
@@ -146,13 +157,14 @@ async function handleAddTask(event) {
         auditor: document.getElementById('auditor').value,
         categoria: document.getElementById('categoria').value,
         subtarea: document.getElementById('subtarea').value,
+        periodo: document.getElementById('periodo').value, // ✅ NUEVO CAMPO
         porcentaje: parseInt(document.getElementById('porcentaje').value),
         comentario: document.getElementById('comentario').value,
         fecha_estimada_fin: document.getElementById('fechaEstimadaFin').value || null
     };
 
     // Validación
-    if (!formData.auditor || !formData.categoria || !formData.subtarea) {
+    if (!formData.auditor || !formData.categoria || !formData.subtarea || !formData.periodo) {
         showNotification('Por favor completa todos los campos obligatorios', 'error');
         return;
     }
@@ -218,12 +230,14 @@ async function deleteTask(taskId) {
 }
 
 // Renderizar tabla de tareas
-// Actualizar la función renderTasksTable para mostrar la fecha estimada:
+
+
 function renderTasksTable() {
     const tbody = document.querySelector('#tasksTable tbody');
     const auditorFilter = document.getElementById('auditorFilter').value;
     const categoriaFilter = document.getElementById('categoriaFilter').value;
-    
+    const periodoFilter = document.getElementById('periodoFilter').value; //  NUEVO FILTRO
+
     let filteredTasks = tasks;
     
     if (auditorFilter) {
@@ -233,11 +247,82 @@ function renderTasksTable() {
     if (categoriaFilter) {
         filteredTasks = filteredTasks.filter(task => task.categoria === categoriaFilter);
     }
+
+    //  NUEVO FILTRO POR PERÍODO
+    if (periodoFilter) {
+        filteredTasks = filteredTasks.filter(task => task.periodo === periodoFilter);
+    }
+    
+    // ✅ ORDENAMIENTO POR PRIORIDAD DE VENCIMIENTO
+    filteredTasks.sort((a, b) => {
+        const hoy = new Date();
+        
+        // Función para calcular la prioridad de una tarea
+        function calcularPrioridad(task) {
+            // 1. Tareas completadas van al final (prioridad más baja)
+            if (task.porcentaje === 100) {
+                return 1000; // Valor alto = baja prioridad
+            }
+            
+            // 2. Tareas sin fecha van después de las vencidas pero antes que las completadas
+            if (!task.fecha_estimada_fin) {
+                return 900;
+            }
+            
+            const fechaEstimada = new Date(task.fecha_estimada_fin);
+            const diasRestantes = Math.ceil((fechaEstimada - hoy) / (1000 * 60 * 60 * 24));
+            
+            // 3. Tareas vencidas tienen máxima prioridad (ordenadas por cuánto tiempo están vencidas)
+            if (diasRestantes < 0) {
+                return Math.abs(diasRestantes); // Más vencida = menor número = mayor prioridad
+            }
+            
+            // 4. Tareas próximas a vencer (0-7 días) - alta prioridad
+            if (diasRestantes <= 7) {
+                return 100 + diasRestantes; // Entre 100-107
+            }
+            
+            // 5. Tareas con más tiempo - menor prioridad
+            return 200 + diasRestantes;
+        }
+        
+        const prioridadA = calcularPrioridad(a);
+        const prioridadB = calcularPrioridad(b);
+        
+        // Si tienen la misma prioridad, ordenar por fecha de actualización (más reciente primero)
+        if (prioridadA === prioridadB) {
+            return new Date(b.fecha_actualizacion) - new Date(a.fecha_actualizacion);
+        }
+        
+        return prioridadA - prioridadB; // Número menor = mayor prioridad = aparece primero
+    });
     
     tbody.innerHTML = '';
     
-    filteredTasks.forEach(task => {
+    filteredTasks.forEach((task, index) => {
         const row = document.createElement('tr');
+        
+        // Agregar clase CSS según la prioridad para resaltar visualmente
+        let rowClass = '';
+        if (task.porcentaje === 100) {
+            rowClass = 'task-completed';
+        } else if (task.fecha_estimada_fin) {
+            const hoy = new Date();
+            const fechaEstimada = new Date(task.fecha_estimada_fin);
+            const diasRestantes = Math.ceil((fechaEstimada - hoy) / (1000 * 60 * 60 * 24));
+            
+            if (diasRestantes < 0) {
+                rowClass = 'task-overdue';
+            } else if (diasRestantes <= 2) {
+                rowClass = 'task-urgent';
+            } else if (diasRestantes <= 7) {
+                rowClass = 'task-soon';
+            }
+        }
+        
+        if (rowClass) {
+            row.className = rowClass;
+        }
         
         // Crear el contenido de la revisión
         const revisionContent = createRevisionContent(task);
@@ -245,10 +330,12 @@ function renderTasksTable() {
         // Calcular estado de la fecha
         const fechaEstimadaContent = createFechaEstimadaContent(task);
         
+        //  AGREGAR COLUMNA DE PERÍODO
         row.innerHTML = `
             <td>${task.auditor}</td>
             <td>${task.categoria}</td>
             <td>${task.subtarea}</td>
+            <td><span class="periodo-badge periodo-${task.periodo}">${task.periodo}</span></td>
             <td>
                 <div class="progress-bar">
                     <div class="progress-fill" style="width: ${task.porcentaje}%"></div>
@@ -269,7 +356,32 @@ function renderTasksTable() {
         tbody.appendChild(row);
     });
 }
+// ===== FUNCIÓN NUEVA: Actualizar filtros con períodos =====
+function actualizarFiltros() {
+    // Actualizar filtro de períodos
+    const periodoFilter = document.getElementById('periodoFilter');
+    if (periodoFilter) {
+        periodoFilter.innerHTML = '<option value="">Todos los períodos</option>';
+        PERIODOS.forEach(periodo => {
+            const option = document.createElement('option');
+            option.value = periodo.value;
+            option.textContent = periodo.label;
+            periodoFilter.appendChild(option);
+        });
+    }
 
+    // Actualizar select de período en formulario
+    const periodoSelect = document.getElementById('periodo');
+    if (periodoSelect) {
+        periodoSelect.innerHTML = '<option value="">Seleccionar período</option>';
+        PERIODOS.forEach(periodo => {
+            const option = document.createElement('option');
+            option.value = periodo.value;
+            option.textContent = periodo.label;
+            periodoSelect.appendChild(option);
+        });
+    }
+}
 // Cargar dashboard
 async function loadDashboard() {
     try {
@@ -491,11 +603,13 @@ function renderStats(stats) {
             <div class="stat-number">${Math.round(globalStats.promedio_avance_global)}%</div>
             <div class="stat-label">Progreso Promedio</div>
         </div>
+        <!--
         <div class="stat-item ${globalStats.avance_ponderado_tiempo < 80 ? 'stat-attention' : ''}">
             <div class="stat-number">${Math.round(globalStats.avance_ponderado_tiempo)}%</div>
             <div class="stat-label">Eficiencia Temporal</div>
             <div class="stat-detail">Avance vs. tiempo esperado</div>
         </div>
+         -->
         <div class="stat-item ${globalStats.cumplimiento_plazos_global < 80 ? 'stat-warning' : ''}">
             <div class="stat-number">${globalStats.cumplimiento_plazos_global}%</div>
             <div class="stat-label">Cumplimiento de Plazos</div>
@@ -649,14 +763,18 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
+function resetHora(fecha) {
+    return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+}
+
 function createFechaEstimadaContent(task) {
     if (!task.fecha_estimada_fin) {
         return '<span class="no-date">Sin fecha</span>';
     }
 
-    const fechaEstimada = new Date(task.fecha_estimada_fin);
-    const hoy = new Date();
-    const fechaCreacion = new Date(task.fecha_creacion);
+    const fechaEstimada = resetHora(new Date(task.fecha_estimada_fin));
+    const hoy = resetHora(new Date());
+    const fechaCreacion = resetHora(new Date(task.fecha_creacion));
 
     let diasRestantes = Math.ceil((fechaEstimada - hoy) / (1000 * 60 * 60 * 24));
     let progresoEsperado;
@@ -684,8 +802,22 @@ function createFechaEstimadaContent(task) {
         statusClass = 'fecha-proxima'; // Amarillo
         statusIcon = '🟡';
     } else {
-        statusClass = 'fecha-normal'; // Azul u otro estilo
+        statusClass = 'fecha-normal'; // Azul
         statusIcon = '📅';
+    }
+
+    let fechaInfo = '';
+    if (task.porcentaje < 100) {
+        const diasMensaje = diasRestantes < 0
+            ? `Retrasada por ${Math.abs(diasRestantes)} días`
+            : `Quedan: ${diasRestantes} días`;
+
+        fechaInfo = `
+            <div class="fecha-info">
+                <div><small>Esperado: ${Math.round(progresoEsperado)}%</small></div>
+                <div><small>${diasMensaje}</small></div>
+            </div>
+        `;
     }
 
     return `
@@ -693,14 +825,11 @@ function createFechaEstimadaContent(task) {
             <div class="fecha-display">
                 ${statusIcon} ${formatDate(task.fecha_estimada_fin)}
             </div>
-            <div class="fecha-info">
-                <div><small>Esperado: ${Math.round(progresoEsperado)}%</small></div>
-                <div><small>Quedan: ${diasRestantes} días</small></div>
-
-            </div>
+            ${fechaInfo}
         </div>
     `;
 }
+
 
 
 // Función para manejar la revisión del jefe

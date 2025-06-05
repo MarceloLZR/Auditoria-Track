@@ -26,13 +26,14 @@ if (!fs.existsSync(dbPath)) {
 function initDatabase() {
   db = new Database(dbPath);
   
-  // Crear tabla de tareas (código actualizado)
+  // Crear tabla de tareas (código actualizado con período)
   db.exec(`
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       auditor TEXT NOT NULL,
       categoria TEXT NOT NULL,
       subtarea TEXT NOT NULL,
+      periodo TEXT NOT NULL DEFAULT 'Q1',
       porcentaje INTEGER NOT NULL DEFAULT 0,
       comentario TEXT,
       fecha_estimada_fin DATE,
@@ -72,10 +73,17 @@ function updateDatabase() {
       db.exec(`ALTER TABLE tasks ADD COLUMN fecha_estimada_fin DATE;`);
       console.log('Columna fecha_estimada_fin agregada exitosamente');
     }
+
+    // ✅ NUEVA: Agregar columna de período si no existe
+    if (!columnNames.includes('periodo')) {
+      db.exec(`ALTER TABLE tasks ADD COLUMN periodo TEXT DEFAULT 'Q1';`);
+      console.log('Columna periodo agregada exitosamente');
+    }
   } catch (error) {
     console.error('Error al actualizar base de datos:', error);
   }
 }
+
 
 
 function createWindow() {
@@ -127,13 +135,14 @@ ipcMain.handle('get-tasks', () => {
 ipcMain.handle('add-task', (event, task) => {
   try {
     const stmt = db.prepare(`
-      INSERT INTO tasks (auditor, categoria, subtarea, porcentaje, comentario, fecha_estimada_fin, fecha_creacion, fecha_actualizacion)
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
+      INSERT INTO tasks (auditor, categoria, subtarea, periodo, porcentaje, comentario, fecha_estimada_fin, fecha_creacion, fecha_actualizacion)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
     `);
     const result = stmt.run(
       task.auditor, 
       task.categoria, 
-      task.subtarea, 
+      task.subtarea,
+      task.periodo || 'Q1', // 
       task.porcentaje, 
       task.comentario,
       task.fecha_estimada_fin || null
@@ -166,6 +175,17 @@ ipcMain.handle('update-task', (event, id, updates) => {
 });
 
 
+
+ipcMain.handle('delete-task', (event, id) => {
+  try {
+    const stmt = db.prepare('DELETE FROM tasks WHERE id = ?');
+    const result = stmt.run(id);
+    return { success: true, changes: result.changes };
+  } catch (error) {
+    console.error('Error al eliminar tarea:', error);
+    return { success: false, error: error.message };
+  }
+});
 
 //  función get-stats en main.js versión mejorada:
 

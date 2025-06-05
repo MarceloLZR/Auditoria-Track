@@ -60,12 +60,17 @@
                         </select>
                         <select id="categoriaFilter">
                             <option value="">Todas las categorías</option>
-                            <option value="Auditorías y trabajos adicionales">Auditorías y trabajos adicionales</option>
+                            <option value="Auditorías">Auditorías</option>
                             <option value="Auditoría continua">Auditoría continua</option>
                             <option value="Seguimiento de observaciones internas">Seguimiento de observaciones internas</option>
                             <option value="Seguimiento de observaciones regulatorias">Seguimiento de observaciones regulatorias</option>
                             <option value="Reportes SIRAI">Reportes SIRAI</option>
                             <option value="Capacitaciones">Capacitaciones</option>
+                            <option value="Trabajos adicionales">Trabajos adicionales</option>
+                        </select>
+                        <select id="periodoFilter">
+                            <option value="">Todos los períodos</option>
+                            <!-- Se llena dinámicamente -->
                         </select>
                     </div>
                 </div>
@@ -76,6 +81,7 @@
                                 <th>Auditor</th>
                                 <th>Categoría</th>
                                 <th>Subtarea</th>
+                                <th>Período</th> 
                                 <th>Progreso</th>
                                 <th>Comentario</th>
                                 <th>Fecha Estimada</th>
@@ -112,15 +118,24 @@
                         <label for="categoria">📁 Categoría:</label>
                         <select id="categoria" required>
                             <option value="">Seleccionar categoría</option>
-                            <option value="Auditorías y trabajos adicionales">Auditorías y trabajos adicionales</option>
+                            <option value="Auditorías">Auditorías</option>
                             <option value="Auditoría continua">Auditoría continua</option>
                             <option value="Seguimiento de observaciones internas">Seguimiento de observaciones internas</option>
                             <option value="Seguimiento de observaciones regulatorias">Seguimiento de observaciones regulatorias</option>
                             <option value="Reportes SIRAI">Reportes SIRAI</option>
                             <option value="Capacitaciones">Capacitaciones</option>
+                            <option value="Trabajos adicionales">Trabajos adicionales</option>
                         </select>
                     </div>
 
+                    <div class="form-group">
+                        <label for="periodo">📅 Período:</label>
+                        <select id="periodo" required>
+                            <option value="">Seleccionar período</option>
+                            <!-- Se llena dinámicamente con JavaScript -->
+                        </select>
+                        <small class="form-help">Q1: Nov-Ene | Q2: Feb-Abr | Q3: May-Jul | Q4: Ago-Oct</small>
+                    </div>
                     <div class="form-group">
                         <label for="subtarea">📝 Subtarea:</label>
                         <input type="text" id="subtarea" placeholder="Nombre de la subtarea" required>
