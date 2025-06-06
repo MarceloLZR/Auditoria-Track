@@ -783,7 +783,11 @@ function createFechaEstimadaContent(task) {
         progresoEsperado = 100;
     } else {
         const diasTotales = Math.ceil((fechaEstimada - fechaCreacion) / (1000 * 60 * 60 * 24));
-        const diasTranscurridos = Math.ceil((hoy - fechaCreacion) / (1000 * 60 * 60 * 24));
+        let diasTranscurridos = Math.ceil((hoy - fechaCreacion) / (1000 * 60 * 60 * 24));
+        if (diasTranscurridos >= 0 && diasTranscurridos <= diasTotales) {
+            diasTranscurridos += 1; // Incluir el día actual como parte del progreso
+        }
+
         progresoEsperado = diasTotales > 0 
             ? Math.min(100, Math.max(0, (diasTranscurridos / diasTotales) * 100))
             : 100;
