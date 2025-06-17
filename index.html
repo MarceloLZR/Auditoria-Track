@@ -197,35 +197,56 @@
         </div>
     </div>
     <!-- Agrega este modal después del modal existente de editar tareas -->
-    <div id="revisionModal" class="modal">
+    <div id="revisionModal" class="modal modal-large">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>👨‍💼 Revisión del Jefe</h3>
+                <h3>💬 Chat de Revisión</h3>
                 <span class="close-revision">&times;</span>
             </div>
-            <div class="task-info">
-                <p><strong>Auditor:</strong> <span id="revisionAuditor"></span></p>
-                <p><strong>Subtarea:</strong> <span id="revisionSubtarea"></span></p>
-                <p><strong>Progreso:</strong> <span id="revisionProgreso"></span></p>
+            
+            <!-- Información de la tarea -->
+            <div class="task-info-header">
+                <div class="task-details">
+                    <p><strong>📋 Subtarea:</strong> <span id="revisionSubtarea"></span></p>
+                    <p><strong>👤 Auditor:</strong> <span id="revisionAuditor"></span></p>
+                    <p><strong>📊 Progreso:</strong> <span id="revisionProgreso"></span></p>
+                </div>
+                <div class="revision-controls">
+                    <select id="currentUser" class="user-selector">
+                        <!-- Solo se cargarán el jefe y el auditor responsable dinámicamente -->
+                    </select>
+                    <div class="status-controls">
+                        <button type="button" id="approveBtn" class="btn btn-success btn-small">✅ Revisar</button>
+                        <button type="button" id="pendingBtn" class="btn btn-warning btn-small">⏳ Pendiente</button>
+                    </div>
+                </div>
             </div>
-            <form id="revisionForm">
+
+            <!-- Estado actual de la revisión -->
+            <div id="revisionStatus" class="revision-status-bar">
+                <!-- Se llena dinámicamente -->
+            </div>
+
+            <!-- Chat de mensajes -->
+            <div class="chat-container">
+                <div id="messagesContainer" class="messages-container">
+                    <!-- Los mensajes se cargan aquí dinámicamente -->
+                </div>
+            </div>
+
+            <!-- Formulario para nuevo mensaje -->
+            <form id="chatForm" class="chat-form">
                 <input type="hidden" id="revisionTaskId">
-                <div class="form-group">
-                    <label for="auditorRevisor">👨‍💼 Auditor Revisor:</label>
-                    <input type="text" id="auditorRevisor" value="Manuel Nuñez" required>
-                </div>
-                <div class="form-group">
-                    <label for="revisionComentario">💬 Comentario de Revisión:</label>
-                    <textarea id="revisionComentario" rows="4" placeholder="Deja aquí tu comentario, observaciones o visto bueno..."></textarea>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeRevisionModal()">❌ Cancelar</button>
-                    <button type="submit" class="btn btn-success">✅ Guardar Revisión</button>
+                <div class="message-input-container">
+                    <textarea id="newMessage" placeholder="Escribe tu mensaje aquí..." rows="3" required></textarea>
+                    <div class="chat-form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeRevisionModal()">❌ Cerrar</button>
+                        <button type="submit" class="btn btn-primary">📤 Enviar Mensaje</button>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
-
     <script src="renderer.js"></script>
 </body>
 </html>

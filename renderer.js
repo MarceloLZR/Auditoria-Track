@@ -1,6 +1,6 @@
 const { ipcRenderer } = require('electron');
 
-// Variables globales
+// Variables globales HOLA
 let tasks = [];
 let auditorChart = null;
 let categoriaChart = null;
@@ -25,6 +25,9 @@ const PERIODOS = [
     { value: 'Q4', label: 'Q4 (Ago-Oct)' }
 ];
 
+let currentMessages = [];
+let currentTaskId = null;
+let currentUser = 'Manuel Nuñez'; // Usuario por defecto
 
 function actualizarSelectAuditores() {
     const selects = [
@@ -93,16 +96,20 @@ function initializeEventListeners() {
     document.getElementById('categoriaFilter').addEventListener('change', filterTasks);
     document.getElementById('periodoFilter').addEventListener('change', filterTasks);
 
-    // Modal
-    document.querySelector('.close').addEventListener('click', closeEditModal);
-    window.addEventListener('click', function(event) {
-        if (event.target === document.getElementById('editModal')) {
-            closeEditModal();
+     // ✅ NUEVO: Event listeners para el chat
+    document.getElementById('chatForm').addEventListener('submit', handleSendMessage);
+    document.getElementById('currentUser').addEventListener('change', function() {
+        currentUser = this.value;
+        // ✅ ACTUALIZAR VISIBILIDAD DE BOTONES AL CAMBIAR USUARIO
+        updateApprovalButtonsVisibility();
+        if (currentTaskId) {
+            markMessagesAsRead(currentTaskId);
         }
     });
     
-    // Formulario de revisión
-    document.getElementById('revisionForm').addEventListener('submit', handleRevision);
+    // Botones de estado
+    document.getElementById('approveBtn').addEventListener('click', () => updateRevisionStatus('revisado'));
+    document.getElementById('pendingBtn').addEventListener('click', () => updateRevisionStatus('pendiente'));
     
     // Modal de revisión
     document.querySelector('.close-revision').addEventListener('click', closeRevisionModal);
@@ -870,18 +877,36 @@ async function handleRevision(event) {
 }
 
 // Función para abrir el modal de revisión
-function openRevisionModal(taskId) {
+// ===== REEMPLAZAR la función openRevisionModal =====
+async function openRevisionModal(taskId) {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     
+    currentTaskId = taskId;
+    
+    // Llenar información de la tarea
     document.getElementById('revisionTaskId').value = task.id;
     document.getElementById('revisionAuditor').textContent = task.auditor;
     document.getElementById('revisionSubtarea').textContent = task.subtarea;
     document.getElementById('revisionProgreso').textContent = task.porcentaje + '%';
-    document.getElementById('revisionComentario').value = task.revision_jefe || '';
-    document.getElementById('auditorRevisor').value = task.auditor_revisor || 'Manuel Nuñez';
     
+    // ✅ CONFIGURAR SELECTOR DE USUARIOS DINÁMICAMENTE
+    setupUserSelector(task);
+    
+    // Actualizar barra de estado
+    updateRevisionStatusBar(task);
+    
+    // Cargar mensajes
+    await loadRevisionMessages(taskId);
+    
+    // Marcar mensajes como leídos
+    await markMessagesAsRead(taskId);
+    
+    // Mostrar modal
     document.getElementById('revisionModal').style.display = 'block';
+    
+    // Scroll al final del chat
+    scrollToBottom();
 }
 
 // Función para cerrar el modal de revisión
@@ -891,54 +916,328 @@ function closeRevisionModal() {
 
 
 // Función para crear el contenido de la revisión
+// ===== REEMPLAZAR la función createRevisionContent =====
 function createRevisionContent(task) {
     const estado = task.estado_revision || 'pendiente';
-    const revision = task.revision_jefe || '';
-    const auditorRevisor = task.auditor_revisor || 'Manuel Nuñez';
-    const fechaRevision = task.fecha_revision;
+    const mensajesNoLeidos = task.mensajes_no_leidos || 0;
+    const ultimoMensaje = task.ultimo_mensaje_fecha;
+    const ultimoAutor = task.ultimo_mensaje_autor;
     
     let statusClass = estado === 'revisado' ? 'revisado' : 'pendiente';
     let statusIcon = estado === 'revisado' ? '✅' : '⏳';
     let statusText = estado === 'revisado' ? 'Revisado' : 'Pendiente';
     
-    // Si fue editada después de la revisión, mostrar un indicador especial
-    let editIndicator = '';
-    if (estado === 'pendiente' && fechaRevision) {
-        editIndicator = '<div class="edit-indicator">🔄 Requiere nueva revisión</div>';
+    // Indicador de mensajes no leídos
+    let unreadIndicator = '';
+    if (mensajesNoLeidos > 0) {
+        unreadIndicator = `<span class="unread-indicator">${mensajesNoLeidos}</span>`;
     }
     
-    let preview = '';
-    if (revision && revision.length > 0) {
-        // Si está pendiente pero hay comentario previo, mostrarlo con opacidad reducida
-        const previewClass = estado === 'pendiente' ? 'revision-preview-outdated' : 'revision-preview';
-        preview = `<div class="${previewClass}">${revision.substring(0, 60)}${revision.length > 60 ? '...' : ''}</div>`;
+    // Preview del último mensaje
+    let lastMessagePreview = '';
+    if (ultimoMensaje && ultimoAutor) {
+        const fechaUltimo = new Date(ultimoMensaje);
+        const ahora = new Date();
+        const diferencia = ahora - fechaUltimo;
+        const minutos = Math.floor(diferencia / 60000);
+        
+        let tiempoTexto = '';
+        if (minutos < 1) {
+            tiempoTexto = 'hace un momento';
+        } else if (minutos < 60) {
+            tiempoTexto = `hace ${minutos}m`;
+        } else if (minutos < 1440) {
+            tiempoTexto = `hace ${Math.floor(minutos/60)}h`;
+        } else {
+            tiempoTexto = formatDate(ultimoMensaje);
+        }
+        
+        lastMessagePreview = `
+            <div class="chat-preview">
+                <strong>${ultimoAutor}:</strong> Último mensaje
+                <br><small>${tiempoTexto}</small>
+            </div>
+        `;
     }
     
-    let fechaInfo = '';
-    if (fechaRevision) {
-        const fechaClass = estado === 'pendiente' ? 'revision-info-outdated' : 'revision-info';
-        fechaInfo = `<div class="${fechaClass}">📅 ${formatDate(fechaRevision)}</div>`;
-    }
+    // Clases para el botón según si hay mensajes no leídos
+    let buttonClass = mensajesNoLeidos > 0 ? 'revision-button has-unread' : 'revision-button';
     
     return `
         <div class="revision-content">
-            <div class="revision-status ${statusClass}">
+            <div class="revision-status ${statusClass} ${mensajesNoLeidos > 0 ? 'has-unread' : ''}">
                 <div class="revision-badge">
                     <span>${statusIcon}</span>
                     <span>${statusText}</span>
+                    ${unreadIndicator}
                 </div>
-                <small>por ${auditorRevisor}</small>
             </div>
-            ${editIndicator}
-            ${preview}
-            ${fechaInfo}
-            <button class="revision-button" onclick="openRevisionModal(${task.id})">
-                📝 ${estado === 'revisado' ? 'Ver/Editar' : 'Revisar'}
+            ${lastMessagePreview}
+            <button class="${buttonClass}" onclick="openRevisionModal(${task.id})">
+                💬 Chat ${mensajesNoLeidos > 0 ? `(${mensajesNoLeidos})` : ''}
             </button>
         </div>
     `;
 }
 
+// ✅ NUEVA FUNCIÓN: Configurar selector de usuarios dinámicamente
+
+
+function setupUserSelector(task) {
+    const userSelect = document.getElementById('currentUser');
+    userSelect.innerHTML = '';
+    
+    // Siempre incluir al jefe
+    const jefeOption = document.createElement('option');
+    jefeOption.value = 'Manuel Nuñez';
+    jefeOption.textContent = '👨‍💼 Manuel Nuñez (Jefe)';
+    userSelect.appendChild(jefeOption);
+    
+    // Incluir al auditor responsable si no es el jefe
+    if (task.auditor !== 'Manuel Nuñez') {
+        const auditorOption = document.createElement('option');
+        auditorOption.value = task.auditor;
+        
+        // Agregar emoji según el auditor
+        let emoji = '👩‍💼';
+        if (task.auditor === 'Marcelo Nuñez' || task.auditor === 'Lautaro Ballesteros') {
+            emoji = '👨‍💼';
+        }
+        
+        auditorOption.textContent = `${emoji} ${task.auditor}`;
+        userSelect.appendChild(auditorOption);
+    }
+    
+    // Establecer el usuario actual
+    userSelect.value = currentUser;
+    
+    // ✅ MOSTRAR/OCULTAR BOTONES DE APROBACIÓN SEGÚN EL USUARIO
+    updateApprovalButtonsVisibility();
+}
+
+// ✅ NUEVA FUNCIÓN: Mostrar/ocultar botones de aprobación
+function updateApprovalButtonsVisibility() {
+    const statusControls = document.querySelector('.status-controls');
+    const approveBtn = document.getElementById('approveBtn');
+    const pendingBtn = document.getElementById('pendingBtn');
+    
+    if (currentUser === 'Manuel Nuñez') {
+        // Solo el jefe puede ver los botones
+        statusControls.style.display = 'flex';
+        approveBtn.style.display = 'inline-block';
+        pendingBtn.style.display = 'inline-block';
+    } else {
+        // Los auditores no pueden ver los botones
+        statusControls.style.display = 'none';
+        approveBtn.style.display = 'none';
+        pendingBtn.style.display = 'none';
+    }
+}
+
+// ===== NUEVAS FUNCIONES PARA EL CHAT =====
+
+// Cargar mensajes del chat
+async function loadRevisionMessages(taskId) {
+    try {
+        currentMessages = await ipcRenderer.invoke('get-revision-messages', taskId);
+        renderMessages();
+    } catch (error) {
+        console.error('Error al cargar mensajes:', error);
+        showNotification('Error al cargar mensajes', 'error');
+    }
+}
+
+// Renderizar mensajes en el chat
+function renderMessages() {
+    const container = document.getElementById('messagesContainer');
+    container.innerHTML = '';
+    
+    if (currentMessages.length === 0) {
+        container.innerHTML = '<div class="empty-chat">💬 No hay mensajes aún. ¡Inicia la conversación!</div>';
+        return;
+    }
+    
+    currentMessages.forEach(message => {
+        const messageDiv = document.createElement('div');
+        
+        let messageClass = 'message';
+        if (message.tipo === 'sistema') {
+            messageClass += ' system';
+        } else if (message.autor === currentUser) {
+            messageClass += ' own';
+        } else {
+            messageClass += ' other';
+            if (!message.leido) {
+                messageClass += ' unread';
+            }
+        }
+        
+        messageDiv.className = messageClass;
+        
+        if (message.tipo === 'sistema') {
+            // ✅ MENSAJES DEL SISTEMA MÁS COMPACTOS
+            messageDiv.innerHTML = `
+                <div class="message-content">${message.mensaje}</div>
+                <div class="message-date" style="font-size: 0.7em; margin-top: 3px;">${formatDateTime(message.fecha)}</div>
+            `;
+        } else {
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    <span class="message-author">${message.autor}</span>
+                    <span class="message-date">${formatDateTime(message.fecha)}</span>
+                </div>
+                <div class="message-content">${message.mensaje}</div>
+            `;
+        }
+        
+        container.appendChild(messageDiv);
+    });
+}
+
+// Enviar nuevo mensaje
+async function handleSendMessage(event) {
+    event.preventDefault();
+    
+    const messageText = document.getElementById('newMessage').value.trim();
+    if (!messageText) return;
+    
+    try {
+        const result = await ipcRenderer.invoke('add-revision-message', currentTaskId, {
+            autor: currentUser,
+            mensaje: messageText
+        });
+        
+        if (result.success) {
+            document.getElementById('newMessage').value = '';
+            await loadRevisionMessages(currentTaskId);
+            scrollToBottom();
+            
+            // Recargar la tabla para actualizar los contadores
+            await loadTasks();
+            
+            showNotification('Mensaje enviado', 'success');
+        } else {
+            showNotification('Error al enviar mensaje', 'error');
+        }
+    } catch (error) {
+        console.error('Error al enviar mensaje:', error);
+        showNotification('Error al enviar mensaje', 'error');
+    }
+}
+
+// Marcar mensajes como leídos
+async function markMessagesAsRead(taskId) {
+    try {
+        await ipcRenderer.invoke('mark-messages-read', taskId, currentUser);
+        await loadTasks(); // Actualizar la tabla
+    } catch (error) {
+        console.error('Error al marcar mensajes como leídos:', error);
+    }
+}
+
+// Actualizar estado de revisión (aprobar/pendiente)
+async function updateRevisionStatus(status) {
+    // ✅ VERIFICAR QUE SOLO EL JEFE PUEDA CAMBIAR EL ESTADO
+    if (currentUser !== 'Manuel Nuñez') {
+        showNotification('Solo el jefe puede aprobar o marcar como pendiente las tareas', 'error');
+        return;
+    }
+    
+    try {
+        // ✅ ENVIAR EL ESTADO CORRECTO
+        const estadoParaEnviar = status === 'approve' ? 'revisado' : 'pendiente';
+        
+        const result = await ipcRenderer.invoke('update-revision-status', currentTaskId, estadoParaEnviar, currentUser);
+        
+        if (result.success) {
+            // ✅ MENSAJE CORRECTO SEGÚN LA ACCIÓN
+            const mensaje = status === 'approve' ? 'revisada' : 'marcada como pendiente';
+            showNotification(`Tarea ${mensaje}`, 'success');
+            
+            // Recargar mensajes y datos
+            await loadRevisionMessages(currentTaskId);
+            await loadTasks();
+            
+            // Actualizar barra de estado
+            const task = tasks.find(t => t.id === currentTaskId);
+            if (task) {
+                // Actualizar el estado local de la tarea
+                task.estado_revision = estadoParaEnviar;
+                task.auditor_revisor = currentUser;
+                task.fecha_revision = new Date().toISOString();
+                updateRevisionStatusBar(task);
+            }
+            
+            scrollToBottom();
+        } else {
+            showNotification('Error al actualizar estado', 'error');
+        }
+    } catch (error) {
+        console.error('Error al actualizar estado:', error);
+        showNotification('Error al actualizar estado', 'error');
+    }
+}
+
+// Actualizar barra de estado de revisión
+function updateRevisionStatusBar(task) {
+    const statusBar = document.getElementById('revisionStatus');
+    const estado = task.estado_revision || 'pendiente';
+    
+    let statusClass = estado === 'revisado' ? 'approved' : 'pending';
+    let statusText = estado === 'revisado' ? 
+        `✅ TAREA REVISADA por ${task.auditor_revisor || 'Manuel Nuñez'}` : 
+        `⏳ TAREA PENDIENTE DE REVISIÓN`;
+    
+    if (task.fecha_revision) {
+        statusText += ` - ${formatDateTime(task.fecha_revision)}`;
+    }
+    
+    statusBar.className = `revision-status-bar ${statusClass}`;
+    statusBar.textContent = statusText;
+}
+
+// Scroll al final del chat
+function scrollToBottom() {
+    setTimeout(() => {
+        const container = document.getElementById('messagesContainer');
+        container.scrollTop = container.scrollHeight;
+    }, 100);
+}
+
+// ===== MODIFICAR la función closeRevisionModal =====
+function closeRevisionModal() {
+    document.getElementById('revisionModal').style.display = 'none';
+    currentTaskId = null;
+    currentMessages = [];
+}
+
+// ===== NUEVA FUNCIÓN: Formatear fecha y hora =====
+function formatDateTime(dateString) {
+    if (!dateString) return '-';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMinutes = Math.floor(diffMs / 60000);
+    
+    if (diffMinutes < 1) {
+        return 'hace un momento';
+    } else if (diffMinutes < 60) {
+        return `hace ${diffMinutes}m`;
+    } else if (diffMinutes < 1440) {
+        return `hace ${Math.floor(diffMinutes / 60)}h`;
+    } else if (diffMinutes < 10080) {
+        return `hace ${Math.floor(diffMinutes / 1440)}d`;
+    } else {
+        return date.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+}
 // Agregar estilos de animación para notificaciones
 const style = document.createElement('style');
 style.textContent = `
@@ -952,3 +1251,74 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+
+// ✅ AGREGAR ESTOS EVENT LISTENERS AL FINAL DE renderer.js
+
+// Event listeners para el modal de revisión
+document.addEventListener('DOMContentLoaded', function() {
+    // Cerrar modal de revisión
+    const closeRevisionBtn = document.querySelector('.close-revision');
+    if (closeRevisionBtn) {
+        closeRevisionBtn.addEventListener('click', closeRevisionModal);
+    }
+
+    // Cerrar modal al hacer clic fuera de él
+    window.addEventListener('click', function(event) {
+        const revisionModal = document.getElementById('revisionModal');
+        if (event.target === revisionModal) {
+            closeRevisionModal();
+        }
+    });
+
+    // Formulario de chat
+    const chatForm = document.getElementById('chatForm');
+    if (chatForm) {
+        chatForm.addEventListener('submit', handleSendMessage);
+    }
+
+    // Botones de aprobación/pendiente
+    const approveBtn = document.getElementById('approveBtn');
+    const pendingBtn = document.getElementById('pendingBtn');
+    
+    if (approveBtn) {
+        approveBtn.addEventListener('click', () => updateRevisionStatus('approve'));
+    }
+    
+    if (pendingBtn) {
+        pendingBtn.addEventListener('click', () => updateRevisionStatus('pending'));
+    }
+
+    // Cambio de usuario
+    const currentUserSelect = document.getElementById('currentUser');
+    if (currentUserSelect) {
+        currentUserSelect.addEventListener('change', function() {
+            currentUser = this.value;
+            updateApprovalButtonsVisibility();
+        });
+    }
+
+    // ✅ TECLA ESC PARA CERRAR EL MODAL
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            const revisionModal = document.getElementById('revisionModal');
+            if (revisionModal && revisionModal.style.display === 'block') {
+                closeRevisionModal();
+            }
+        }
+    });
+
+    // ✅ ENTER + CTRL PARA ENVIAR MENSAJE
+    const newMessageTextarea = document.getElementById('newMessage');
+    if (newMessageTextarea) {
+        newMessageTextarea.addEventListener('keydown', function(event) {
+            if (event.ctrlKey && event.key === 'Enter') {
+                event.preventDefault();
+                const chatForm = document.getElementById('chatForm');
+                if (chatForm) {
+                    chatForm.dispatchEvent(new Event('submit'));
+                }
+            }
+        });
+    }
+});

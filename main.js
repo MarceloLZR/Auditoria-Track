@@ -7,8 +7,8 @@ let mainWindow;
 let db;
 
 // ✅ Carpeta compartida (por ejemplo, C:/AuditoriaData)
-const dataDir = '\\\\b200603sv214\\groupscentral$\\Map_W\\GGBP200_Auditoria_Compartido\\2025\\CODIGOS\\DB\\AuditoriaData';
-//const dataDir = path.join('C:', 'AuditoriaData');
+//const dataDir = '\\\\b200603sv214\\groupscentral$\\Map_W\\GGBP200_Auditoria_Compartido\\2025\\CODIGOS\\DB\\AuditoriaData';
+const dataDir = path.join('C:', 'AuditoriaData');
 
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -26,7 +26,7 @@ if (!fs.existsSync(dbPath)) {
 function initDatabase() {
   db = new Database(dbPath);
   
-  // Crear tabla de tareas (código actualizado con período)
+  // Tabla de tareas (existente)
   db.exec(`
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,18 +46,30 @@ function initDatabase() {
     )
   `);
   
-  // Actualizar tabla existente si es necesario
-  updateDatabase();
+  // ✅ NUEVA TABLA: Mensajes de chat de revisión
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS revision_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id INTEGER NOT NULL,
+      autor TEXT NOT NULL,
+      mensaje TEXT NOT NULL,
+      fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+      tipo TEXT DEFAULT 'mensaje',
+      leido BOOLEAN DEFAULT FALSE,
+      FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE
+    )
+  `);
   
+  updateDatabase();
   console.log('Base de datos inicializada');
 }
 
 function updateDatabase() {
   try {
-    // Verificar si las columnas ya existen
     const tableInfo = db.pragma('table_info(tasks)');
     const columnNames = tableInfo.map(col => col.name);
     
+    // Campos existentes...
     if (!columnNames.includes('revision_jefe')) {
       db.exec(`
         ALTER TABLE tasks ADD COLUMN revision_jefe TEXT;
@@ -65,20 +77,23 @@ function updateDatabase() {
         ALTER TABLE tasks ADD COLUMN estado_revision TEXT DEFAULT 'pendiente';
         ALTER TABLE tasks ADD COLUMN auditor_revisor TEXT DEFAULT 'Manuel Nuñez';
       `);
-      console.log('Columnas de revisión agregadas exitosamente');
     }
 
-    // Agregar columna de fecha estimada si no existe
-    if (!columnNames.includes('fecha_estimada_fin')) {
-      db.exec(`ALTER TABLE tasks ADD COLUMN fecha_estimada_fin DATE;`);
-      console.log('Columna fecha_estimada_fin agregada exitosamente');
+    // ✅ NUEVOS CAMPOS para el chat
+    if (!columnNames.includes('mensajes_no_leidos')) {
+      db.exec(`
+        ALTER TABLE tasks ADD COLUMN mensajes_no_leidos INTEGER DEFAULT 0;
+        ALTER TABLE tasks ADD COLUMN ultimo_mensaje_fecha DATETIME;
+        ALTER TABLE tasks ADD COLUMN ultimo_mensaje_autor TEXT;
+      `);
+      console.log('Campos de chat agregados exitosamente');
     }
 
-    // ✅ NUEVA: Agregar columna de período si no existe
-    if (!columnNames.includes('periodo')) {
-      db.exec(`ALTER TABLE tasks ADD COLUMN periodo TEXT DEFAULT 'Q1';`);
-      console.log('Columna periodo agregada exitosamente');
-    }
+    // Crear índices para mejor rendimiento
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_revision_messages_task_id ON revision_messages(task_id);
+      CREATE INDEX IF NOT EXISTS idx_revision_messages_fecha ON revision_messages(fecha);
+    `);
   } catch (error) {
     console.error('Error al actualizar base de datos:', error);
   }
@@ -163,10 +178,23 @@ ipcMain.handle('update-task', (event, id, updates) => {
           fecha_actualizacion = datetime('now', 'localtime'),
           revision_jefe = NULL,
           fecha_revision = NULL,
-          estado_revision = 'pendiente'
+          estado_revision = 'pendiente',
+          mensajes_no_leidos = 0,
+          ultimo_mensaje_fecha = NULL,
+          ultimo_mensaje_autor = NULL
       WHERE id = ?
     `);
     const result = stmt.run(updates.porcentaje, updates.comentario, id);
+
+    // ✅ NUEVO: Agregar mensaje automático indicando que la tarea fue actualizada
+    if (result.changes > 0) {
+      const msgStmt = db.prepare(`
+        INSERT INTO revision_messages (task_id, autor, mensaje, tipo, fecha)
+        VALUES (?, 'SISTEMA', ?, 'sistema', datetime('now', 'localtime'))
+      `);
+      msgStmt.run(id, `📝 Tarea actualizada - Progreso: ${updates.porcentaje}%`);
+    }
+
     return { success: true, changes: result.changes };
   } catch (error) {
     console.error('Error al actualizar tarea:', error);
@@ -385,19 +413,117 @@ ipcMain.handle('get-stats', () => {
   }
 });
 
-// Agrega este nuevo IPC handler después de los existentes:
-ipcMain.handle('update-revision', (event, id, revisionData) => {
+// ✅ NUEVO: Agregar mensaje al chat de revisión
+ipcMain.handle('add-revision-message', (event, taskId, messageData) => {
   try {
-    const stmt = db.prepare(`
+    const { autor, mensaje } = messageData;
+    
+    // Insertar mensaje
+    const msgStmt = db.prepare(`
+      INSERT INTO revision_messages (task_id, autor, mensaje, fecha)
+      VALUES (?, ?, ?, datetime('now', 'localtime'))
+    `);
+    const msgResult = msgStmt.run(taskId, autor, mensaje);
+
+    // Actualizar contador de mensajes no leídos y último mensaje
+    const updateTaskStmt = db.prepare(`
       UPDATE tasks 
-      SET revision_jefe = ?, fecha_revision = datetime('now', 'localtime'), estado_revision = ?, auditor_revisor = ?
+      SET mensajes_no_leidos = mensajes_no_leidos + 1,
+          ultimo_mensaje_fecha = datetime('now', 'localtime'),
+          ultimo_mensaje_autor = ?
       WHERE id = ?
     `);
-    const estado = revisionData.revision.trim() ? 'revisado' : 'pendiente';
-    const result = stmt.run(revisionData.revision, estado, revisionData.auditorRevisor, id);
+    updateTaskStmt.run(autor, taskId);
+
+    return { success: true, messageId: msgResult.lastInsertRowid };
+  } catch (error) {
+    console.error('Error al agregar mensaje:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// ✅ NUEVO: Obtener mensajes de chat de una tarea
+ipcMain.handle('get-revision-messages', (event, taskId) => {
+  try {
+    const stmt = db.prepare(`
+      SELECT * FROM revision_messages 
+      WHERE task_id = ? 
+      ORDER BY fecha ASC
+    `);
+    return stmt.all(taskId);
+  } catch (error) {
+    console.error('Error al obtener mensajes:', error);
+    return [];
+  }
+});
+
+// ✅ NUEVO: Marcar mensajes como leídos
+ipcMain.handle('mark-messages-read', (event, taskId, usuario) => {
+  try {
+    // Marcar como leídos los mensajes que NO son del usuario actual
+    const stmt = db.prepare(`
+      UPDATE revision_messages 
+      SET leido = TRUE 
+      WHERE task_id = ? AND autor != ? AND leido = FALSE
+    `);
+    stmt.run(taskId, usuario);
+
+    // Recalcular mensajes no leídos para este usuario
+    const countStmt = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM revision_messages 
+      WHERE task_id = ? AND autor != ? AND leido = FALSE
+    `);
+    const result = countStmt.get(taskId, usuario);
+
+    // Actualizar contador en la tarea
+    const updateStmt = db.prepare(`
+      UPDATE tasks 
+      SET mensajes_no_leidos = ?
+      WHERE id = ?
+    `);
+    updateStmt.run(result.count, taskId);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error al marcar mensajes como leídos:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// ✅ NUEVO: Cambiar estado de revisión (aprobado/pendiente)
+ipcMain.handle('update-revision-status', (event, taskId, status, reviewer) => {
+  try {
+    // Normalizar el estado
+    const estadoNormalizado = status.toLowerCase() === 'revisado' || status.toLowerCase() === 'revisar' ? 'revisado' : 'pendiente';
+    
+    const stmt = db.prepare(`
+      UPDATE tasks 
+      SET estado_revision = ?,
+          auditor_revisor = ?,
+          fecha_revision = datetime('now', 'localtime')
+      WHERE id = ?
+    `);
+    const result = stmt.run(estadoNormalizado, reviewer, taskId);
+
+    // ✅ MENSAJES CORRECTOS según el estado
+    const msgStmt = db.prepare(`
+      INSERT INTO revision_messages (task_id, autor, mensaje, tipo, fecha)
+      VALUES (?, 'SISTEMA', ?, 'sistema', datetime('now', 'localtime'))
+    `);
+    
+    let statusText;
+    if (estadoNormalizado === 'revisado') {
+      statusText = `✅ Tarea REVISADA por ${reviewer}`;
+    } else {
+      statusText = `⏳ Tarea marcada como PENDIENTE por ${reviewer}`;
+    }
+    
+    msgStmt.run(taskId, statusText);
+
     return { success: true, changes: result.changes };
   } catch (error) {
-    console.error('Error al actualizar revisión:', error);
+    console.error('Error al actualizar estado:', error);
     return { success: false, error: error.message };
   }
 });
